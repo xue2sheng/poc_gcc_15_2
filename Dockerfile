@@ -59,6 +59,24 @@ RUN make -j1 V=1
 # Install
 RUN make install-strip
 
+# TBB (static)
+WORKDIR /build/tbb
+RUN apk add --no-cache make cmake git
+RUN git clone https://github.com/uxlfoundation/oneTBB.git
+WORKDIR /build/tbb/oneTBB
+RUN mkdir build
+WORKDIR /build/tbb/oneTBB/build
+RUN cmake -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DTBB_STATIC=ON \
+      -DTBB_TEST=OFF \
+      -DTBB_STRICT=OFF \
+      -DCMAKE_INSTALL_PREFIX=${PREFIX}/tbb \
+      ..
+RUN cmake --build . 
+RUN cmake --install .
+
 # Stage 2: Deployment on Ubuntu 24.04
 FROM ubuntu:24.04
 
