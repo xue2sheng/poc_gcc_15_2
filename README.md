@@ -21,7 +21,7 @@ Do not forget to statically compile once your g++ points to */opt/toolchain/gcc1
     clean: test001
         rm -rf test001
 
-Regarding **TBB**
+### Regarding **TBB**
 
 **main.cpp**
 
@@ -69,3 +69,43 @@ Regarding **TBB**
             rm -f $(TARGET)
     .PHONY: all clean
 
+### Regarding **boost**
+
+**main.cpp**
+
+    #include <iostream>
+    #include <print>         // C++23
+    #include <boost/asio.hpp>
+    #include <chrono>
+    int main() {
+        // C++23 std::print
+        std::print("Hello from C++23 and Boost Asio!\n");
+        boost::asio::io_context io;
+        // Set a timer for 1 second
+        boost::asio::steady_timer t(io, boost::asio::chrono::seconds(1));
+        std::print("Waiting for timer...\n");
+        t.wait();
+        std::print("Timer expired. Goodbye!\n");
+        return 0;
+    }
+
+**Makefile**
+
+    TOOLCHAIN = /opt/toolchain/gcc15-musl
+    CXX = $(TOOLCHAIN)/bin/g++
+    BOOST_ROOT = $(TOOLCHAIN)/boost
+    # C++23 flag
+    CXXFLAGS = -std=c++23 -O3
+    # Include paths
+    INCLUDES = -I$(BOOST_ROOT)/include
+    # Linker flags
+    # We use -static to ensure it links against the musl sysroot
+    # rather than looking for Ubuntu's glibc.
+    LDFLAGS = -static -L$(BOOST_ROOT)/lib
+    LIBS = -lpthread
+    TARGET = hello_musl
+    all: $(TARGET)
+    $(TARGET): main.cpp
+        $(CXX) $(CXXFLAGS) $(INCLUDES) main.cpp -o $(TARGET) $(LDFLAGS) $(LIBS)
+    clean:
+        rm -f $(TARGET)

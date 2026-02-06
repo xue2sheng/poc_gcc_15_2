@@ -26,7 +26,6 @@ RUN mv gmp-${GMP_VER} gcc-${GCC_VER}/gmp && \
     mv mpc-${MPC_VER} gcc-${GCC_VER}/mpc && \
     mv isl-${ISL_VER} gcc-${GCC_VER}/isl
 
-
 # REFINED SYSROOT: We need more than just headers.
 # We must include the actual library symlinks so the internal 'xgcc' can link test programs.
 RUN mkdir -p ${PREFIX}/sysroot/usr/lib ${PREFIX}/sysroot/lib ${PREFIX}/sysroot/usr/include && \
@@ -76,6 +75,25 @@ RUN cmake -DCMAKE_BUILD_TYPE=Release \
       ..
 RUN cmake --build . 
 RUN cmake --install .
+
+# --- Add Boost (Static) ---
+WORKDIR /build/boost
+RUN curl -L https://github.com/boostorg/boost/releases/download/boost-1.90.0/boost-1.90.0-b2-nodocs.tar.gz | tar xz
+WORKDIR /build/boost/boost-1.90.0
+RUN ./bootstrap.sh --prefix=${PREFIX}/boost
+RUN ./b2 install \
+    toolset=gcc \
+    link=static \
+    variant=release \
+    threading=multi \
+    runtime-link=static \
+    --with-system \
+    --with-thread \
+    --with-atomic \
+    --with-chrono \
+    --with-date_time \
+    --layout=system \
+    -j$(nproc)
 
 # Stage 2: Deployment on Ubuntu 24.04
 FROM ubuntu:24.04

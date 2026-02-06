@@ -26,7 +26,6 @@ RUN mv gmp-${GMP_VER} gcc-${GCC_VER}/gmp && \
     mv mpc-${MPC_VER} gcc-${GCC_VER}/mpc && \
     mv isl-${ISL_VER} gcc-${GCC_VER}/isl
 
-
 # REFINED SYSROOT: We need more than just headers.
 # We must include the actual library symlinks so the internal 'xgcc' can link test programs.
 RUN mkdir -p ${PREFIX}/sysroot/usr/lib ${PREFIX}/sysroot/lib ${PREFIX}/sysroot/usr/include && \
@@ -58,6 +57,43 @@ RUN make -j1 V=1
 
 # Install
 RUN make install-strip
+
+# TBB (static)
+WORKDIR /build/tbb
+RUN apk add --no-cache make cmake git
+RUN git clone https://github.com/uxlfoundation/oneTBB.git
+WORKDIR /build/tbb/oneTBB
+RUN mkdir build
+WORKDIR /build/tbb/oneTBB/build
+RUN cmake -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DTBB_STATIC=ON \
+      -DTBB_TEST=OFF \
+      -DTBB_STRICT=OFF \
+      -DCMAKE_INSTALL_PREFIX=${PREFIX}/tbb \
+      ..
+RUN cmake --build . 
+RUN cmake --install .
+
+# --- Add Boost (Static) ---
+WORKDIR /build/boost
+RUN curl -L https://github.com/boostorg/boost/releases/download/boost-1.90.0/boost-1.90.0-b2-nodocs.tar.gz | tar xz
+WORKDIR /build/boost/boost-1.90.0
+RUN ./bootstrap.sh --prefix=${PREFIX}/boost
+RUN ./b2 install \
+    toolset=gcc \
+    link=static \
+    variant=release \
+    threading=multi \
+    runtime-link=static \
+    --with-system \
+    --with-thread \
+    --with-atomic \
+    --with-chrono \
+    --with-date_time \
+    --layout=system \
+    -j$(nproc)
 
 # Stage 2: Deployment on Ubuntu 24.04
 FROM ubuntu:24.04
