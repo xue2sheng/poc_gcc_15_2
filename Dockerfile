@@ -92,8 +92,16 @@ RUN ./b2 install \
     --with-atomic \
     --with-chrono \
     --with-date_time \
+    --with-iostreams \
+    --with-filesystem \
     --layout=system \
     -j$(nproc)
+
+# add gnuplot-stream (only header but depends on boost)
+WORKDIR ${PREFIX}
+RUN mkdir -p gnuplot/include
+WORKDIR ${PREFIX}/gnuplot/include
+RUN curl -L https://raw.githubusercontent.com/dstahlke/gnuplot-iostream/refs/heads/master/gnuplot-iostream.h -o gnuplot-iostream.h
 
 # Stage 2: Deployment on Ubuntu 24.04
 FROM ubuntu:24.04
@@ -109,6 +117,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     binutils \
     make cmake vim neovim \
     ca-certificates \
+    gnuplot \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /root

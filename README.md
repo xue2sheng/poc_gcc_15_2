@@ -109,3 +109,57 @@ Do not forget to statically compile once your g++ points to */opt/toolchain/gcc1
         $(CXX) $(CXXFLAGS) $(INCLUDES) main.cpp -o $(TARGET) $(LDFLAGS) $(LIBS)
     clean:
         rm -f $(TARGET)
+
+
+### Regarding **gnuplot**
+
+If you're on Windows, you might be interested in installing MobaXTerm and run its included XServer before launching the docker container with **DISPLAY** configured:
+
+    docker run -it -e DISPLAY=host.docker.internal:0.0 poc_gcc_15_2
+
+**main.cpp**
+
+    #include <vector>
+    #include <cmath>
+    #include <print>
+    #include <utility>
+    // Boost dependencies for gnuplot-iostream
+    #include <boost/range/adaptor/transformed.hpp>
+    #include <boost/range/irange.hpp>
+    // This is often the missing link for std::pair support
+    #include <boost/tuple/tuple.hpp>
+    #include "gnuplot-iostream.h"
+    int main() {
+        // Open gnuplot process
+        gnuplotio::Gnuplot gp;
+        // Create some data using standard pair
+        std::vector<std::pair<double, double>> points;
+        for(double x = -5; x < 5; x += 0.1) {
+            points.push_back({x, std::sin(x)});
+        }
+        std::print("Sending data to gnuplot...\n");
+        // Use the dumb terminal to verify in the console
+        gp << "set terminal dumb\n";
+        gp << "plot '-' with lines title 'C++23 Static Sin Wave'\n";
+        // Use send1d (more explicit than <<) if operator overloading fails
+        gp.send1d(points);
+        return 0;
+    }
+
+**Makefile**
+
+    TOOLCHAIN = /opt/toolchain/gcc15-musl
+    CXX = $(TOOLCHAIN)/bin/g++
+    BOOST_ROOT = $(TOOLCHAIN)/boost
+    GNUPLOT_ROOT = $(TOOLCHAIN)/gnuplot
+    CXXFLAGS = -std=c++23 -O3
+    INCLUDES = -I$(BOOST_ROOT)/include -I$(GNUPLOT_ROOT)/include
+    # Note: The order of libraries is important for static linking
+    LDFLAGS = -static -L$(BOOST_ROOT)/lib
+    LIBS = -lboost_iostreams -lboost_filesystem -lpthread
+    TARGET = gnuplot_test
+    all: $(TARGET)
+    $(TARGET): main.cpp
+            $(CXX) $(CXXFLAGS) $(INCLUDES) main.cpp -o $(TARGET) $(LDFLAGS) $(LIBS)
+    clean:
+            rm -f $(TARGET)
