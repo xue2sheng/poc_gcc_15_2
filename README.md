@@ -267,13 +267,17 @@ In this case, we're not looking for statically built executables but for cross-b
 
     CXX = /opt/chaintool/gcc15-almalinux/bin/g++
     SYSROOT = /opt/chaintool/gcc15-almalinux/sysroot
+    GCC_LIB = /opt/chaintool/gcc15-almalinux/lib64
     all: main.cpp
             $(CXX) -std=c++23 main.cpp -o test002 \
                 --sysroot=$(SYSROOT) \
                 -B$(SYSROOT)/usr/lib64 \
                 -L$(SYSROOT)/usr/lib64 \
-                -L/opt/chaintool/gcc15-almalinux/lib64 \
-                -Wl,-rpath,/opt/chaintool/gcc15-almalinux/lib64 \
-                -Wl,-rpath-link,$(SYSROOT)/usr/lib64
+                -L$(GCC_LIB) \
+                -static-libstdc++ \
+                -static-libgcc \
+                -Wl,--start-group -lc -lm -lgcc_s -Wl,--end-group \
+                $(SYSROOT)/usr/lib64/ld-linux-x86-64.so.2 \
+                -Wl,-rpath-link,$(SYSROOT)/lib64
     clean: test002
             rm -rf test002
