@@ -209,3 +209,44 @@ That helper to connect to **Postgres** requires *openssl* and *libpq*. Besides, 
         $(CXX) $(CXXFLAGS) main.cpp -o hello_pqxx $(LDFLAGS)
     clean:
         rm -f hello_pqxx
+
+### Regarding google-test
+
+**main.cpp**
+
+    #include <gtest/gtest.h>
+    // A simple function to test
+    int add(int a, int b) {
+        return a + b;
+    }
+    TEST(AdditionTest, HandlesPositiveNumbers) {
+        EXPECT_EQ(add(1, 2), 3);
+    }
+    TEST(AdditionTest, HandlesZero) {
+        EXPECT_EQ(add(0, 0), 0);
+    }
+
+**Makefile**
+
+    TOOLCHAIN_ROOT = /opt/toolchain/gcc15-musl
+    SYSROOT        = $(TOOLCHAIN_ROOT)/sysroot
+    GTEST_ROOT     = $(TOOLCHAIN_ROOT)/googletest
+    # Compilers
+    CXX = $(TOOLCHAIN_ROOT)/bin/g++
+    CC  = $(TOOLCHAIN_ROOT)/bin/gcc
+    # Flags
+    # --sysroot: tells g++ where to find musl headers/libs
+    # -static:   ensures a completely standalone binary
+    CXXFLAGS = --sysroot=$(SYSROOT) -I$(GTEST_ROOT)/include -std=c++20 -static -O2
+    LDFLAGS  = --sysroot=$(SYSROOT) -L$(GTEST_ROOT)/lib -static
+    # Libraries
+    # Order matters: gtest_main depends on gtest
+    LIBS = -lgtest_main -lgtest -lpthread
+    TARGET = hello_gtest
+    all: $(TARGET)
+    $(TARGET): main.cpp
+            $(CXX) $(CXXFLAGS) main.cpp $(LDFLAGS) $(LIBS) -o $(TARGET)
+    clean:
+            rm -f $(TARGET)
+    test: all
+            ./$(TARGET)

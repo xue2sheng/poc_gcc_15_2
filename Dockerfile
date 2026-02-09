@@ -179,6 +179,22 @@ RUN cmake -S . -B build \
 RUN cmake --build build -j$(nproc) && \
     cmake --install build
 
+# --- Add GoogleTest (Static) ---
+WORKDIR /build/googletest
+RUN curl -L https://github.com/google/googletest/archive/refs/tags/v1.16.0.tar.gz | tar xz --strip-components=1
+RUN cmake -S . -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/googletest \
+    -DCMAKE_CXX_COMPILER=${PREFIX}/bin/g++ \
+    -DCMAKE_C_COMPILER=${PREFIX}/bin/gcc \
+    -DCMAKE_CXX_FLAGS="--sysroot=${PREFIX}/sysroot -static" \
+    -DCMAKE_EXE_LINKER_FLAGS="-static" \
+    -Dgtest_disable_pthreads=OFF \
+    -Dgtest_force_shared_crt=OFF
+RUN cmake --build build -j$(nproc) && \
+    cmake --install build
+
 ####################### UBUNTU 24.04 ##########################
 
 # Stage 2: Deployment on Ubuntu 24.04
