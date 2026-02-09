@@ -250,3 +250,30 @@ That helper to connect to **Postgres** requires *openssl* and *libpq*. Besides, 
             rm -f $(TARGET)
     test: all
             ./$(TARGET)
+
+# ALMALINUX 9 / REDHAT 9
+
+In this case, we're not looking for statically built executables but for cross-built ones using original Almalinux 9 libc and related libraries.
+
+**main.cpp**
+
+    #include <print>
+    int main() {
+            std::println("Hello World!");
+            return 0;
+    }
+
+**Makefile**
+
+    CXX = /opt/chaintool/gcc15-almalinux/bin/g++
+    SYSROOT = /opt/chaintool/gcc15-almalinux/sysroot
+    all: main.cpp
+            $(CXX) -std=c++23 main.cpp -o test002 \
+                --sysroot=$(SYSROOT) \
+                -B$(SYSROOT)/usr/lib64 \
+                -L$(SYSROOT)/usr/lib64 \
+                -L/opt/chaintool/gcc15-almalinux/lib64 \
+                -Wl,-rpath,/opt/chaintool/gcc15-almalinux/lib64 \
+                -Wl,-rpath-link,$(SYSROOT)/usr/lib64
+    clean: test002
+            rm -rf test002
