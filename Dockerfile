@@ -103,6 +103,84 @@ RUN mkdir -p gnuplot/include
 WORKDIR ${PREFIX}/gnuplot/include
 RUN curl -L https://raw.githubusercontent.com/dstahlke/gnuplot-iostream/refs/heads/master/gnuplot-iostream.h -o gnuplot-iostream.h
 
+# --- Add OpenSSL (Static) ---
+WORKDIR /build/openssl
+RUN curl -L https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0.tar.gz | tar xz --strip-components=1
+# 1. Create a dummy libdl.a because musl integrates it into libc, 
+#    but OpenSSL utilities still try to link -ldl explicitly.
+RUN ar rcs ${PREFIX}/sysroot/usr/lib/libdl.a
+# 2. Configure with no-shared and no-tests
+RUN CC=${PREFIX}/bin/gcc ./Configure linux-x86_64 no-shared no-tests \
+    --prefix=${PREFIX}/openssl \
+    --openssldir=${PREFIX}/openssl \
+    --sysroot=${PREFIX}/sysroot \
+    -static
+# 3. Build and install
+RUN make -j$(nproc) && make install_sw
+
+# --- Build CMake (Static) ---
+WORKDIR /build/cmake
+RUN curl -L https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3.tar.gz | tar xz --strip-components=1
+RUN ./bootstrap --prefix=${PREFIX}/cmake --parallel=$(nproc) -- -DCMAKE_USE_OPENSSL=OFF
+RUN make -j$(nproc) && make install
+# Add the new CMake to our PATH for the rest of the build
+ENV PATH="${PREFIX}/cmake/bin:${PATH}"
+
+# --- Add libpq ---
+WORKDIR /build/postgres
+RUN curl -L https://ftp.postgresql.org/pub/source/v18.0/postgresql-18.0.tar.bz2 | tar xj --strip-components=1
+RUN CC="${PREFIX}/bin/gcc --sysroot=${PREFIX}/sysroot" \
+    LDFLAGS="-L${PREFIX}/openssl/lib64 -L${PREFIX}/sysroot/usr/lib" \
+    CPPFLAGS="-I${PREFIX}/openssl/include" \
+    ./configure \
+    --prefix=${PREFIX}/postgres \
+    --with-ssl=openssl \
+    --without-readline \
+    --without-zlib \
+    --without-icu \
+    --disable-shared \
+    --host=x86_64-alpine-linux-musl
+# 1. Build and install the static library and basic headers
+RUN make -C src/interfaces/libpq -j$(nproc) all-static-lib && \
+    make -C src/interfaces/libpq install-lib-static && \
+    make -C src/include install
+# 2. Install the specific Frontend headers libpqxx needs
+#    We try the official target, and then force-copy libpq-fe.h 
+#    just to be absolutely certain it is where libpqxx expects it.
+RUN make -C src/interfaces/libpq install-public-headers || true && \
+    cp src/interfaces/libpq/libpq-fe.h ${PREFIX}/postgres/include/ && \
+    cp src/interfaces/libpq/libpq-events.h ${PREFIX}/postgres/include/
+# 3. Install the port and common libs (needed for static linking later)
+RUN make -C src/common install && \
+    make -C src/port install
+
+# --- Add libpqxx 8.x ---
+WORKDIR /build/libpqxx
+RUN curl -L https://github.com/jtv/libpqxx/archive/refs/tags/8.0.0-rc4.tar.gz | tar xz --strip-components=1
+#-DPostgreSQL_LIBRARY="${PREFIX}/postgres/lib/libpq.a;${PREFIX}/postgres/lib/libpgcommon.a;${PREFIX}/postgres/lib/libpgport.a;${PREFIX}/ssl/lib/libssl.a;${PREFIX}/ssl/lib/libcrypto.a" \
+# 1. We use -DBUILD_TEST=OFF and -DBUILD_DOC=OFF to reduce the build surface
+# 2. We move the complex library chain to CMAKE_EXE_LINKER_FLAGS so CMake 
+#    doesn't try to parse it into the Makefile target rules for the static lib itself.
+RUN cmake -S . -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/libpqxx \
+    -DCMAKE_CXX_COMPILER=${PREFIX}/bin/g++ \
+    -DCMAKE_C_COMPILER=${PREFIX}/bin/gcc \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_CXX_FLAGS="--sysroot=${PREFIX}/sysroot -I${PREFIX}/postgres/include" \
+    -DPostgreSQL_INCLUDE_DIR=${PREFIX}/postgres/include \
+    -DPostgreSQL_LIBRARY=${PREFIX}/postgres/lib/libpq.a \
+    -DBUILD_TEST=OFF \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_DOC=OFF \
+    -DSKIP_PQXX_TESTS=ON
+# Point cmake to the 'build' directory
+RUN cmake --build build -j$(nproc) && \
+    cmake --install build
+
+####################### UBUNTU 24.04 ##########################
+
 # Stage 2: Deployment on Ubuntu 24.04
 FROM ubuntu:24.04
 

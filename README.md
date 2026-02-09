@@ -163,3 +163,49 @@ If you're on Windows, you might be interested in installing MobaXTerm and run it
             $(CXX) $(CXXFLAGS) $(INCLUDES) main.cpp -o $(TARGET) $(LDFLAGS) $(LIBS)
     clean:
             rm -f $(TARGET)
+
+### Regarding libpqxx
+
+That helper to connect to **Postgres** requires *openssl* and *libpq*. Besides, *cmake* version 4.x is a must
+
+**main.cpp**
+
+    #include <iostream>
+    #include <print>
+    #include <pqxx/pqxx>
+    int main() {
+        // libpqxx version is available via this string
+        std::string version = PQXX_VERSION;
+        std::println("Hello from GCC 15 + Musl!");
+        std::println("libpqxx version: {}", version);
+        return 0;
+    }
+
+**Makefile**
+
+    # --- Path Configuration ---
+    TOOLCHAIN = /opt/toolchain/gcc15-musl
+    PREFIX    = $(TOOLCHAIN)
+    # Compiler definitions
+    CXX      = $(TOOLCHAIN)/bin/g++
+    CXXFLAGS = -std=c++23 -O3 --sysroot=$(TOOLCHAIN)/sysroot \
+               -I$(PREFIX)/libpqxx/include \
+               -I$(PREFIX)/postgres/include \
+               -I$(PREFIX)/openssl/include
+    # --- Library Paths ---
+    LDFLAGS  = -L$(PREFIX)/libpqxx/lib \
+               -L$(PREFIX)/postgres/lib \
+               -L$(PREFIX)/openssl/lib64 \
+               -lpqxx \
+               -lpq \
+               -lpgcommon \
+               -lpgport \
+               -lssl \
+               -lcrypto \
+               -static
+    # --- Targets ---
+    all: hello_pqxx
+    hello_pqxx: main.cpp
+        $(CXX) $(CXXFLAGS) main.cpp -o hello_pqxx $(LDFLAGS)
+    clean:
+        rm -f hello_pqxx
