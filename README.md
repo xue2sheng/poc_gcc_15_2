@@ -346,4 +346,50 @@ Remember to locate your python caller script to reach the shared library.
         std::println("Message: {}", str);
     }
 
+### Regarding **TBB**
 
+**main.cpp**
+
+    #include <iostream>
+    #include <vector>
+    #include <oneapi/tbb.h>
+    int main() {
+        std::cout << "Hello from TBB! Starting parallel execution..." << std::endl;
+        // A simple parallel loop to verify TBB is working
+        tbb::parallel_for(tbb::blocked_range<int>(0, 10),
+            [](const tbb::blocked_range<int>& r) {
+                for (int i = r.begin(); i != r.end(); ++i) {
+                    // Using printf because std::cout is not thread-safe and can scramble output
+                    printf("TBB Task %d processed by thread\n", i);
+                }
+            });
+        std::cout << "Parallel execution finished successfully." << std::endl;
+        return 0;
+    }
+
+**Makefile**
+
+    # Paths matching your Dockerfile Stage 2
+    TOOLCHAIN_ROOT = /opt/toolchain/gcc15-almalinux
+    SYSROOT        = $(TOOLCHAIN_ROOT)/sysroot
+    TBB_ROOT       = $(TOOLCHAIN_ROOT)/tbb
+    # Compilers
+    CXX = $(TOOLCHAIN_ROOT)/bin/g++
+    # Compilation Flags
+    # --sysroot tells the compiler to use AlmaLinux headers/libs instead of Ubuntu's
+    CXXFLAGS = -std=c++23 \
+               --sysroot=$(SYSROOT) \
+               -I$(TBB_ROOT)/include \
+               -O2
+    # Linker Flags
+    # We link TBB statically and include pthreads
+    LDFLAGS = -static-libstdc++ -static-libgcc \
+              -L$(SYSROOT)/usr/lib64 \
+              -Wl,-rpath-link,$(SYSROOT)/lib64 \
+              $(TBB_ROOT)/lib64/libtbb.a \
+              -lpthread -ldl
+    all: tbb_hello
+    tbb_hello: main.cpp
+        $(CXX) $(CXXFLAGS) main.cpp -o tbb_hello $(LDFLAGS)
+    clean:
+        rm -f tbb_hello
