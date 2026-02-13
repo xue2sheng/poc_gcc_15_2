@@ -1,10 +1,12 @@
 # STAGE 1: Build GCC 15.2 on AlmaLinux 9
-FROM almalinux:9 AS builder
+FROM almalinux:9.7 AS almalinux-gcc15
+
+ENV PREFIX=/opt/toolchain/gcc15-almalinux
 
 # Enable CRB for texinfo and install build deps
 RUN dnf install -y 'dnf-command(config-manager)' && \
     dnf config-manager --set-enabled crb && \
-    dnf install -y wget gcc gcc-c++ zlib-devel glibc-devel make bzip2 \
+    dnf install -y wget gcc gcc-c++ zlib-devel glibc-devel make bzip2 cmake make \
     perl-devel autoconf automake texinfo diffutils file flex bison
 
 WORKDIR /build
@@ -15,7 +17,7 @@ WORKDIR /build/gcc-15.2.0
 RUN ./contrib/download_prerequisites
 
 WORKDIR /build/gcc-obj
-RUN ../gcc-15.2.0/configure --prefix=/opt/chaintool/gcc15-almalinux \
+RUN ../gcc-15.2.0/configure --prefix=${PREFIX} \
                 --disable-multilib \
                 --enable-languages=c,c++ \
                 --with-system-zlib \
@@ -26,25 +28,44 @@ RUN make -j$(nproc)
 RUN make install
 
 # --- REVISED SYSROOT CONSTRUCTION ---
-RUN mkdir -p /opt/chaintool/gcc15-almalinux/sysroot/usr/include && \
-    mkdir -p /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64 && \
-    mkdir -p /opt/chaintool/gcc15-almalinux/sysroot/lib64 && \
+RUN mkdir -p ${PREFIX}/sysroot/usr/include && \
+    mkdir -p ${PREFIX}/sysroot/usr/lib64 && \
+    mkdir -p ${PREFIX}/sysroot/lib64 && \
     # Link lib64 to usr/lib64 so both paths work
-    ln -s usr/lib64 /opt/chaintool/gcc15-almalinux/sysroot/lib64
+    ln -s usr/lib64 ${PREFIX}/sysroot/lib64
 # Copy Headers
-RUN cp -ar /usr/include/* /opt/chaintool/gcc15-almalinux/sysroot/usr/include/
+RUN cp -ar /usr/include/* ${PREFIX}/sysroot/usr/include/
 # Copy Runtime Objects
-RUN cp -L /usr/lib64/crt*.o /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/
+RUN cp -L /usr/lib64/crt*.o ${PREFIX}/sysroot/usr/lib64/
 # Copy the actual shared libraries, avoiding the text-file scripts
 # We copy the .so.6 files and then create our own symlinks that the linker will follow
-RUN cp -L /lib64/libc.so.6 /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/ && \
-    cp -L /lib64/libm.so.6 /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/ && \
-    cp -L /lib64/libmvec.so.1 /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/ && \
-    cp -L /lib64/ld-linux-x86-64.so.2 /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/
+RUN cp -L /lib64/libc.so.6 ${PREFIX}/sysroot/usr/lib64/ && \
+    cp -L /lib64/libm.so.6 ${PREFIX}/sysroot/usr/lib64/ && \
+    cp -L /lib64/libmvec.so.1 ${PREFIX}/sysroot/usr/lib64/ && \
+    cp -L /lib64/ld-linux-x86-64.so.2 ${PREFIX}/sysroot/usr/lib64/
 # Manually create the linker symlinks so -lc and -lm work without using scripts
-RUN ln -sf libc.so.6 /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/libc.so && \
-    ln -sf libm.so.6 /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/libm.so && \
-    ln -sf libmvec.so.1 /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/libmvec.so
+RUN ln -sf libc.so.6 ${PREFIX}/sysroot/usr/lib64/libc.so && \
+    ln -sf libm.so.6 ${PREFIX}/sysroot/usr/lib64/libm.so && \
+    ln -sf libmvec.so.1 ${PREFIX}/sysroot/usr/lib64/libmvec.so
+
+# --- BUILD ONETBB 2022.3.0 (STATIC) ---
+WORKDIR /build
+RUN wget https://github.com/uxlfoundation/oneTBB/archive/refs/tags/v2022.3.0.tar.gz && \
+    tar -xf v2022.3.0.tar.gz
+RUN mkdir -p ${PREFIX}/tbb && mkdir -p /build/oneTBB-2022.3.0/build 
+RUN cmake \
+    -S /build/oneTBB-2022.3.0 \
+    -B /build/oneTBB-2022.3.0/build \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/tbb \
+    -DCMAKE_C_COMPILER=${PREFIX}/bin/gcc \
+    -DCMAKE_CXX_COMPILER=${PREFIX}/bin/g++ \
+    -DCMAKE_CXX_FLAGS="-Wno-error=stringop-overflow -Wno-error=maybe-uninitialized -fPIC" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DTBB_STRICT_STATIC=ON \
+    -DTBB_TEST=OFF \
+    -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build /build/oneTBB-2022.3.0/build -j$(nproc) && \
+    cmake --install /build/oneTBB-2022.3.0/build
 
 ################# Ubuntu 24.04 ###################
 
@@ -52,7 +73,7 @@ RUN ln -sf libc.so.6 /opt/chaintool/gcc15-almalinux/sysroot/usr/lib64/libc.so &&
 FROM ubuntu:24.04
 
 # Copy the toolchain
-COPY --from=builder /opt/chaintool/gcc15-almalinux /opt/chaintool/gcc15-almalinux
+COPY --from=almalinux-gcc15 /opt/toolchain/gcc15-almalinux /opt/toolchain/gcc15-almalinux
 
 # Setup path
 ENV PATH="/opt/toolchain/gcc15-almalinux/bin:${PATH}"
