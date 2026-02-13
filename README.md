@@ -369,27 +369,29 @@ Remember to locate your python caller script to reach the shared library.
 
 **Makefile**
 
-    # Paths matching your Dockerfile Stage 2
     TOOLCHAIN_ROOT = /opt/toolchain/gcc15-almalinux
     SYSROOT        = $(TOOLCHAIN_ROOT)/sysroot
     TBB_ROOT       = $(TOOLCHAIN_ROOT)/tbb
-    # Compilers
+    GCC_LIB        = $(TOOLCHAIN_ROOT)/lib64
     CXX = $(TOOLCHAIN_ROOT)/bin/g++
-    # Compilation Flags
-    # --sysroot tells the compiler to use AlmaLinux headers/libs instead of Ubuntu's
+    # Compiler Flags
     CXXFLAGS = -std=c++23 \
                --sysroot=$(SYSROOT) \
+               -B$(SYSROOT)/usr/lib64 \
                -I$(TBB_ROOT)/include \
                -O2
     # Linker Flags
-    # We link TBB statically and include pthreads
-    LDFLAGS = -static-libstdc++ -static-libgcc \
+    LDFLAGS = -static-libstdc++ \
+              -static-libgcc \
               -L$(SYSROOT)/usr/lib64 \
-              -Wl,-rpath-link,$(SYSROOT)/lib64 \
-              $(TBB_ROOT)/lib64/libtbb.a \
-              -lpthread -ldl
+              -L$(GCC_LIB) \
+              -Wl,--start-group -lc -lm -lgcc_s -Wl,--end-group \
+              $(SYSROOT)/usr/lib64/ld-linux-x86-64.so.2 \
+              -Wl,-rpath-link,$(SYSROOT)/lib64
     all: tbb_hello
     tbb_hello: main.cpp
-        $(CXX) $(CXXFLAGS) main.cpp -o tbb_hello $(LDFLAGS)
+            $(CXX) $(CXXFLAGS) main.cpp $(TBB_ROOT)/lib64/libtbb.a -o tbb_hello $(LDFLAGS)
     clean:
-        rm -f tbb_hello
+            rm -f tbb_hello
+
+
