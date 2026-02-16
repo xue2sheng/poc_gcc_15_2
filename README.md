@@ -394,4 +394,55 @@ Remember to locate your python caller script to reach the shared library.
     clean:
             rm -f tbb_hello
 
+### Regarding **Boost**
 
+**main.cpp**
+
+#include <print>
+#include <vector>
+#include <algorithm>
+#include <boost/version.hpp>
+
+    int main() {
+        // Check Boost Version using C++23 std::print
+        // BOOST_VERSION is formatted as MMmmpp (e.g., 109000 for 1.90.0)
+        std::print("Using Boost version: {}.{}.{}\n", 
+                   BOOST_VERSION / 100000,          // Major
+                   BOOST_VERSION / 100 % 1000,      // Minor
+                   BOOST_VERSION % 100);            // Patch
+        // Modern C++ logic: Sorting with a lambda
+        std::vector<int> nums = {3, 1, 4, 1, 5, 9};
+        std::ranges::sort(nums); // Using C++20/23 ranges for brevity
+        std::print("Sorted numbers: ");
+        for (int n : nums) {
+            std::print("{} ", n);
+        }
+        std::print("\nSuccess: GCC 15.2 and Boost 1.90.0 are working via std::print!\n");
+        return 0;
+    }
+
+**Makefile**
+
+    # --- Makefile ---
+    TOOLCHAIN_ROOT = /opt/toolchain/gcc15-almalinux
+    CXX = $(TOOLCHAIN_ROOT)/bin/g++
+    BOOST_ROOT = $(TOOLCHAIN_ROOT)/boost
+    SYSROOT = $(TOOLCHAIN_ROOT)/sysroot
+    CXXFLAGS = -std=c++23 -O2 \
+               --sysroot=$(SYSROOT) \
+               -I$(BOOST_ROOT)/include
+    # We add -Wl,--no-as-needed so the linker doesn't ignore the loader symbols
+    # We also explicitly link against the loader SO you copied in Stage 1
+    LDFLAGS = -B$(SYSROOT)/usr/lib64 \
+              -L$(SYSROOT)/usr/lib64 \
+              -L$(BOOST_ROOT)/lib \
+              -static-libstdc++ \
+              -static-libgcc \
+              -Wl,--no-as-needed \
+              $(SYSROOT)/usr/lib64/ld-linux-x86-64.so.2
+    TARGET = boost_print_test
+    all: $(TARGET)
+    $(TARGET): main.cpp
+            $(CXX) $(CXXFLAGS) main.cpp -o $(TARGET) $(LDFLAGS)
+    clean:
+            rm -f $(TARGET)

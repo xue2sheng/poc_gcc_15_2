@@ -67,6 +67,27 @@ RUN cmake \
     cmake --build /build/oneTBB-2022.3.0/build -j$(nproc) && \
     cmake --install /build/oneTBB-2022.3.0/build
 
+# --- BUILD BOOST 1.90.0 (STATIC) ---
+WORKDIR /build
+RUN wget https://github.com/boostorg/boost/releases/download/boost-1.90.0/boost-1.90.0-b2-nodocs.tar.gz && \
+    tar -xf boost-1.90.0-b2-nodocs.tar.gz
+WORKDIR /build/boost-1.90.0
+# Bootstrap with the new GCC
+RUN ./bootstrap.sh --prefix=${PREFIX}/boost
+# Create a user-config.jam to force Boost to use our GCC 15 toolchain
+RUN echo "using gcc : 15 : ${PREFIX}/bin/g++ ;" > ~/user-config.jam
+# Build and Install
+# - runtime-link=static: Bundles C++ runtime into the libs (safer for cross-distro)
+# - link=static: Creates .a files
+RUN ./b2 install \
+    toolset=gcc-15 \
+    variant=release \
+    link=static \
+    runtime-link=static \
+    threading=multi \
+    --prefix=${PREFIX}/boost \
+    -j$(nproc)
+
 ################# Ubuntu 24.04 ###################
 
 # STAGE 2: Ubuntu 24.04 Target
