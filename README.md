@@ -446,3 +446,73 @@ Remember to locate your python caller script to reach the shared library.
             $(CXX) $(CXXFLAGS) main.cpp -o $(TARGET) $(LDFLAGS)
     clean:
             rm -f $(TARGET)
+
+### Regarding **gnuplot**
+
+**main.cpp**
+
+    #include <vector>
+    #include <cmath>
+    #include <print>
+    #include <utility>
+    // Boost dependencies for gnuplot-iostream
+    #include <boost/range/adaptor/transformed.hpp>
+    #include <boost/range/irange.hpp>
+    // This is often the missing link for std::pair support
+    #include <boost/tuple/tuple.hpp>
+    #include "gnuplot-iostream.h"
+    int main() {
+        // Open gnuplot process
+        gnuplotio::Gnuplot gp;
+        // Create some data using standard pair
+        std::vector<std::pair<double, double>> points;
+        for(double x = -5; x < 5; x += 0.1) {
+            points.push_back({x, std::sin(x)});
+        }
+        std::print("Sending data to gnuplot...\n");
+        // Use the dumb terminal to verify in the console
+        gp << "set terminal dumb\n";
+        gp << "plot '-' with lines title 'C++23 Static Sin Wave'\n";
+        // Use send1d (more explicit than <<) if operator overloading fails
+        gp.send1d(points);
+        return 0;
+    }
+
+**Makefile**
+
+    # --- Configuration ---
+    TOOLCHAIN_ROOT = /opt/toolchain/gcc15-almalinux
+    CXX          = $(TOOLCHAIN_ROOT)/bin/g++
+    BOOST_ROOT   = $(TOOLCHAIN_ROOT)/boost
+    SYSROOT      = $(TOOLCHAIN_ROOT)/sysroot
+    GNUPLOT_INC  = $(TOOLCHAIN_ROOT)/gnuplot/include
+    # --- Compiler Flags ---
+    # -std=c++23 for std::print
+    # --sysroot forces GCC to use AlmaLinux headers/libs
+    CXXFLAGS = -std=c++23 -O2 \
+               --sysroot=$(SYSROOT) \
+               -I$(BOOST_ROOT)/include \
+               -I$(GNUPLOT_INC)
+    # --- Linker Flags ---
+    # 1. -B: Where to find crt1.o, crti.o
+    # 2. -L: Search paths for static libs
+    # 3. Boost libs: Order matters (iostreams depends on system)
+    # 4. Loader: Explicitly link AlmaLinux's ld-linux to resolve TLS/GLIBC symbols
+    LDFLAGS = -B$(SYSROOT)/usr/lib64 \
+              -L$(SYSROOT)/usr/lib64 \
+              -L$(BOOST_ROOT)/lib \
+              -static-libstdc++ \
+              -static-libgcc \
+              -lboost_iostreams \
+              -lboost_filesystem \
+              -Wl,--no-as-needed \
+              $(SYSROOT)/usr/lib64/ld-linux-x86-64.so.2
+    # --- Targets ---
+    TARGET = gnuplot_test
+    SRC    = main.cpp
+    all: $(TARGET)
+    $(TARGET): $(SRC)
+            $(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+    clean:
+            rm -f $(TARGET)
+    .PHONY: all clean

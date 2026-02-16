@@ -88,6 +88,12 @@ RUN ./b2 install \
     --prefix=${PREFIX}/boost \
     -j$(nproc)
 
+# add gnuplot-stream (only header but depends on boost)
+WORKDIR ${PREFIX}
+RUN mkdir -p gnuplot/include
+WORKDIR ${PREFIX}/gnuplot/include
+RUN curl -L https://raw.githubusercontent.com/dstahlke/gnuplot-iostream/refs/heads/master/gnuplot-iostream.h -o gnuplot-iostream.h
+
 ################# Ubuntu 24.04 ###################
 
 # STAGE 2: Ubuntu 24.04 Target
@@ -102,8 +108,9 @@ ENV PATH="/opt/toolchain/gcc15-almalinux/bin:${PATH}"
 # Install Ubuntu-side tools to allow the compiler to run and link
 RUN apt-get update && apt-get install -y --no-install-recommends \
     binutils \
-    make cmake vim \
+    make cmake vim neovim \
     ca-certificates \
+    gnuplot \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /root
