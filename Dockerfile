@@ -37,6 +37,10 @@ RUN mkdir -p ${PREFIX}/sysroot/usr/include && \
 RUN cp -ar /usr/include/* ${PREFIX}/sysroot/usr/include/
 # Copy Runtime Objects
 RUN cp -L /usr/lib64/crt*.o ${PREFIX}/sysroot/usr/lib64/
+# Add these to your existing Sysroot Construction section:
+RUN ln -s usr/lib64 ${PREFIX}/sysroot/lib && \
+    ln -s usr/lib64 ${PREFIX}/sysroot/usr/lib && \
+    ln -s usr/include ${PREFIX}/sysroot/include
 # Copy the actual shared libraries, avoiding the text-file scripts
 # We copy the .so.6 files and then create our own symlinks that the linker will follow
 RUN cp -L /lib64/libc.so.6 ${PREFIX}/sysroot/usr/lib64/ && \
@@ -127,22 +131,6 @@ RUN make -j1 && make install
 # Add the new CMake to our PATH for the rest of the build
 ENV PATH="${PREFIX}/cmake/bin:${PATH}"
 
-# --- BUILD LIBPQ 18.0 via CMAKE ---
-#WORKDIR /build/postgres
-#RUN curl -L https://ftp.postgresql.org/pub/source/v18.0/postgresql-18.0.tar.bz2 | tar xj --strip-components=1
-#ENV SYSROOT_LIB="/opt/toolchain/gcc15-almalinux/sysroot/usr/lib64"
-#RUN ./configure \
-#    --prefix="${PREFIX}/postgres" \
-#    --with-openssl \
-#    --without-readline \
-#    --without-zlib \
-#    --without-icu \
-#    CFLAGS="-fPIC" \
-#    CPPFLAGS="-I${PREFIX}/openssl/include" \
-#    LDFLAGS="-L${PREFIX}/openssl/lib -L${PREFIX}/openssl/lib64"
-#WORKDIR src/interfaces/libpq
-#RUN make && make install
-
 # --- BUILD LIBPQ 18.0 ---
 WORKDIR /build/postgres
 RUN curl -L https://ftp.postgresql.org/pub/source/v18.0/postgresql-18.0.tar.bz2 | tar xj --strip-components=1
@@ -179,6 +167,31 @@ RUN make -C src/interfaces/libpq install-public-headers || true && \
 RUN make -C src/common install && \
     make -C src/port install
 
+# --- BUILD LIBPQXX 8.0.0-rc4 (STATIC) ---
+WORKDIR /build/libpqxx
+RUN curl -L https://github.com/jtv/libpqxx/archive/refs/tags/8.0.0-rc4.tar.gz | tar xz --strip-components=1
+RUN cmake \
+    -S . \
+    -B build \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/libpqxx \
+    -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+    -DCMAKE_CXX_COMPILER=${PREFIX}/bin/g++ \
+    -DCMAKE_C_COMPILER=${PREFIX}/bin/gcc \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DPQXX_BUILD_TEST=OFF \
+    -DPQXX_BUILD_EXAMPLES=OFF \
+    -DPostgreSQL_TYPE=RELATIVE \
+    -DPostgreSQL_INCLUDE_DIR=${PREFIX}/postgres/include \
+    -DPostgreSQL_LIBRARY="${PREFIX}/postgres/lib/libpq.a" \
+    -DCMAKE_CXX_FLAGS="-fPIC --sysroot=${SYSROOT} -I${PREFIX}/postgres/include -I${PREFIX}/openssl/include" \
+    # Add the internal libs to the linker search path for any config-time checks
+    -DCMAKE_EXE_LINKER_FLAGS="--sysroot=${SYSROOT} -L${PREFIX}/openssl/lib64 -L${PREFIX}/postgres/lib -lpgcommon -lpgport -lssl -lcrypto -lz -lpthread -ldl -lm" \
+    -DSKIP_PQXX_TESTS=ON
+# Build only the library target to be safe
+RUN cmake --build build --target pqxx -j$(nproc) && \
+    cmake --install build && \
+    if [ -d "${PREFIX}/libpqxx/lib64" ]; then ln -s lib64 ${PREFIX}/libpqxx/lib; fi && \
+    ls -R ${PREFIX}/libpqxx  # This will show up in your docker build logs for debugging
 
 ################# Ubuntu 24.04 ###################
 

@@ -516,3 +516,48 @@ Remember to locate your python caller script to reach the shared library.
     clean:
             rm -f $(TARGET)
     .PHONY: all clean
+
+### Regarding **libpqxx**
+
+**main.cpp**
+
+    #include <iostream>
+    #include <print>
+    #include <pqxx/pqxx>
+    int main() {
+        // libpqxx version is available via this string
+        std::string version = PQXX_VERSION;
+        std::println("Hello from GCC 15 + Musl!");
+        std::println("libpqxx version: {}", version);
+        return 0;
+    }
+
+**Makefile**
+
+    # Paths based on your PREFIX
+    TOOLCHAIN_DIR = /opt/toolchain/gcc15-almalinux
+    SYSROOT       = $(TOOLCHAIN_DIR)/sysroot
+    CXX           = $(TOOLCHAIN_DIR)/bin/g++
+    # Compiler flags
+    # -std=c++23 is required for <print>
+    CXXFLAGS = -std=c++23 -fPIC --sysroot=$(SYSROOT) \
+               -I$(TOOLCHAIN_DIR)/libpqxx/include \
+               -I$(TOOLCHAIN_DIR)/postgres/include \
+               -I$(TOOLCHAIN_DIR)/openssl/include
+    # Linker flags
+    # We must use -L to point to our static .a files
+    LDFLAGS = --sysroot=$(SYSROOT) \
+              -L$(TOOLCHAIN_DIR)/libpqxx/lib64 \
+              -L$(TOOLCHAIN_DIR)/postgres/lib \
+              -L$(TOOLCHAIN_DIR)/openssl/lib64 \
+              -L$(TOOLCHAIN_DIR)/openssl/lib
+    # Static Linking Order (Crucial!)
+    # libpqxx -> libpq -> postgres_internals -> openssl -> system_libs
+    LIBS = -lpqxx -lpq -lpgcommon -lpgport -lssl -lcrypto
+    TARGET = test_pqxx
+    SRCS = main.cpp
+    all: $(TARGET)
+    $(TARGET): $(SRCS)
+            $(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS) $(LIBS)
+    clean:
+            rm -f $(TARGET)
