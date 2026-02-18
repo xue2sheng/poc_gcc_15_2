@@ -284,6 +284,36 @@ The aim here is to be able to cross-build c/c++ shared libraries on Ubuntu 24.04
     clean: test002
             rm -rf test002
 
+If you prefer **CMake** with your binaries in a different location at **$HOME**, you might go for
+
+**CMakeLists.txt**
+
+    cmake_minimum_required(VERSION 3.25)
+    project(TestProject LANGUAGES CXX)
+    # 1. Path Definitions (Matching your Makefile)
+    set(TOOLCHAIN_BIN "$ENV{HOME}/toolchain/gcc15-almalinux/bin/g++")
+    set(MY_SYSROOT "$ENV{HOME}/toolchain/gcc15-almalinux/sysroot")
+    set(GCC_LIB "$ENV{HOME}/toolchain/gcc15-almalinux/lib64")
+    # 2. Configure Compiler and Sysroot
+    set(CMAKE_CXX_COMPILER ${TOOLCHAIN_BIN})
+    set(CMAKE_SYSROOT ${MY_SYSROOT})
+    # 3. Define the Executable
+    add_executable(test002 main.cpp)
+    # 4. Set C++ Standard
+    target_compile_features(test002 PRIVATE cxx_std_23)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+    # 5. Compiler & Linker Flags
+    target_compile_options(test002 PRIVATE "-B${MY_SYSROOT}/usr/lib64")
+    target_link_options(test002 PRIVATE
+        "-L${MY_SYSROOT}/usr/lib64"
+        "-L${GCC_LIB}"
+        "-static-libstdc++"
+        "-static-libgcc"
+        "LINKER:--start-group" "-lc" "-lm" "-lgcc_s" "LINKER:--end-group"
+        "${MY_SYSROOT}/usr/lib64/ld-linux-x86-64.so.2"
+        "LINKER:-rpath-link,${MY_SYSROOT}/lib64"
+    )
+
 ### Regarding to Python
 
 Here you are a little shared library to be cross-built on Ubuntu but invoked by python on AlmaLinux/RedHat.
