@@ -193,6 +193,25 @@ RUN cmake --build build --target pqxx -j$(nproc) && \
     if [ -d "${PREFIX}/libpqxx/lib64" ]; then ln -s lib64 ${PREFIX}/libpqxx/lib; fi && \
     ls -R ${PREFIX}/libpqxx  # This will show up in your docker build logs for debugging
 
+# --- Add GoogleTest (Static) ---
+WORKDIR /build/googletest
+RUN curl -L https://github.com/google/googletest/archive/refs/tags/v1.16.0.tar.gz | tar xz --strip-components=1
+RUN cmake -S . -B build \
+    # THIS LINE BYPASSES THE COMPILER CHECK ERROR
+    -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/googletest \
+    -DCMAKE_CXX_COMPILER=${PREFIX}/bin/g++ \
+    -DCMAKE_C_COMPILER=${PREFIX}/bin/gcc \
+    # Remove -static here; it's causing the libc.a search
+    -DCMAKE_CXX_FLAGS="--sysroot=${PREFIX}/sysroot -fPIC" \
+    -DCMAKE_C_FLAGS="--sysroot=${PREFIX}/sysroot -fPIC" \
+    -Dgtest_disable_pthreads=OFF \
+    -Dgtest_force_shared_crt=OFF
+RUN cmake --build build -j$(nproc) && \
+    cmake --install build
+
 ################# Ubuntu 24.04 ###################
 
 # STAGE 2: Ubuntu 24.04 Target

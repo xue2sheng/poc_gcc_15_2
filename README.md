@@ -561,3 +561,45 @@ Remember to locate your python caller script to reach the shared library.
             $(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS) $(LIBS)
     clean:
             rm -f $(TARGET)
+
+### Regarding **google test**
+
+**main.cpp**
+
+    #include <gtest/gtest.h>
+    // A simple function to test
+    int add(int a, int b) {
+        return a + b;
+    }
+    TEST(AdditionTest, HandlesPositiveNumbers) {
+        EXPECT_EQ(add(1, 2), 3);
+    }
+    TEST(AdditionTest, HandlesZero) {
+        EXPECT_EQ(add(0, 0), 0);
+    }
+
+**Makefile**
+
+    # Paths based on your setup
+    TOOLCHAIN_DIR = /opt/toolchain/gcc15-almalinux
+    SYSROOT       = $(TOOLCHAIN_DIR)/sysroot
+    CXX           = $(TOOLCHAIN_DIR)/bin/g++
+    # Compiler flags
+    # GTest requires C++14 or newer; using C++23 for consistency with your GCC 15
+    CXXFLAGS = -std=c++23 -fPIC --sysroot=$(SYSROOT) \
+               -I$(TOOLCHAIN_DIR)/googletest/include
+    # Linker flags
+    LDFLAGS = --sysroot=$(SYSROOT) \
+              -L$(TOOLCHAIN_DIR)/googletest/lib64 \
+              -L$(TOOLCHAIN_DIR)/googletest/lib
+    # Library Order: GTest Main provides the 'main()' function,
+    # GTest is the core, and pthread is the system dependency.
+    LIBS = -lgtest_main -lgtest
+    TARGET = test_runner
+    SRCS = main.cpp
+    all: $(TARGET)
+    $(TARGET): $(SRCS)
+            $(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS) $(LIBS)
+    clean:
+            rm -f $(TARGET)
+    run: $(TARGET)
