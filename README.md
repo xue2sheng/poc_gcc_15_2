@@ -725,4 +725,39 @@ Remember to locate your python caller script to reach the shared library.
         std::println("Message: {}", str);
     }
 
+### Regarding **TBB**
+
+**main.cpp**
+
+    #include <iostream>
+    #include <vector>
+    #include <oneapi/tbb.h>
+    int main() {
+        std::cout << "Hello from TBB! Starting parallel execution..." << std::endl;
+        // A simple parallel loop to verify TBB is working
+        tbb::parallel_for(tbb::blocked_range<int>(0, 10),
+            [](const tbb::blocked_range<int>& r) {
+                for (int i = r.begin(); i != r.end(); ++i) {
+                    // Using printf because std::cout is not thread-safe and can scramble output
+                    printf("TBB Task %d processed by thread\n", i);
+                }
+            });
+        std::cout << "Parallel execution finished successfully." << std::endl;
+        return 0;
+    }
+
+**Makefile**
+
+    PREFIX      := /opt/toolchain/gcc15-ubuntu
+    CXX         := $(PREFIX)/bin/g++
+    CXXFLAGS    := -std=c++23 -Wall -Wextra -O3 -I ${PREFIX}/tbb/include
+    LDFLAGS     := -L$(PREFIX)/lib64 -Wl,-rpath,$(PREFIX)/lib64 -Wl,--enable-new-dtags
+    TARGET      := tbb_example
+    SRC         := main.cpp
+    all: $(TARGET)
+    $(TARGET): $(SRC)
+        $(CXX) $(CXXFLAGS) $(SRC) ${PREFIX}/tbb/lib/libtbb.a -o $(TARGET) $(LDFLAGS)
+    clean:
+        rm -f $(TARGET)
+    .PHONY: all clean
 
