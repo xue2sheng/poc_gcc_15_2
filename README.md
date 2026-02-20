@@ -110,7 +110,6 @@ Do not forget to statically compile once your g++ points to */opt/toolchain/gcc1
     clean:
         rm -f $(TARGET)
 
-
 ### Regarding **gnuplot**
 
 If you're on Windows, you might be interested in installing MobaXTerm and run its included XServer before launching the docker container with **DISPLAY** configured:
@@ -759,5 +758,47 @@ Remember to locate your python caller script to reach the shared library.
         $(CXX) $(CXXFLAGS) $(SRC) ${PREFIX}/tbb/lib/libtbb.a -o $(TARGET) $(LDFLAGS)
     clean:
         rm -f $(TARGET)
+    .PHONY: all clean
+### Regarding **Boost**
+
+**main.cpp**
+
+#include <print>
+#include <vector>
+#include <algorithm>
+#include <boost/version.hpp>
+
+    int main() {
+        // Check Boost Version using C++23 std::print
+        // BOOST_VERSION is formatted as MMmmpp (e.g., 109000 for 1.90.0)
+        std::print("Using Boost version: {}.{}.{}\n", 
+                   BOOST_VERSION / 100000,          // Major
+                   BOOST_VERSION / 100 % 1000,      // Minor
+                   BOOST_VERSION % 100);            // Patch
+        // Modern C++ logic: Sorting with a lambda
+        std::vector<int> nums = {3, 1, 4, 1, 5, 9};
+        std::ranges::sort(nums); // Using C++20/23 ranges for brevity
+        std::print("Sorted numbers: ");
+        for (int n : nums) {
+            std::print("{} ", n);
+        }
+        std::print("\nSuccess: GCC 15.2 and Boost 1.90.0 are working via std::print!\n");
+        return 0;
+    }
+
+**Makefile**
+
+    PREFIX          = /opt/toolchain/gcc15-ubuntu
+    CXX             = $(PREFIX)/bin/g++
+    BOOST_ROOT      = $(PREFIX)/boost
+    CXXFLAGS        = -std=c++23 -O2 -I$(BOOST_ROOT)/include
+    LDFLAGS         = -L$(PREFIX)/lib64 -Wl,-rpath,$(PREFIX)/lib64 -L$(BOOST_ROOT)/lib
+    TARGET          = boost_print_test
+    SRC             = main.cpp
+    all: $(TARGET)
+    $(TARGET): $(SRC)
+            $(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+    clean:
+            rm -f $(TARGET)
     .PHONY: all clean
 
