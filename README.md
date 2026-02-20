@@ -329,7 +329,7 @@ Remember to locate your python caller script to reach the shared library.
     my_str = ctypes.c_char_p("Testing cross-built shared library".encode('utf-8'))
     TESTING_LIB.type_something(my_str)
 
-**testingLib.h**
+**testingLib.hpp**
 
     #ifndef TESTINGLIB_H
     #define TESTINGLIB_H
@@ -347,7 +347,7 @@ Remember to locate your python caller script to reach the shared library.
     cmake_minimum_required(VERSION 3.20)
     set(CMAKE_CXX_COMPILER_WORKS TRUE)
     set(CMAKE_C_COMPILER_WORKS TRUE)
-    set(CMAKE_C_COMPILER   "/opt/chaintool/gcc14-almalinux/bin/gcc")
+    set(CMAKE_C_COMPILER   "/opt/chaintool/gcc15-almalinux/bin/gcc")
     set(CMAKE_CXX_COMPILER "/opt/chaintool/gcc15-almalinux/bin/g++")
     project(testingLib CXX)
     set(SYSROOT "/opt/chaintool/gcc15-almalinux/sysroot")
@@ -370,7 +370,7 @@ Remember to locate your python caller script to reach the shared library.
 
 **main.cpp**
 
-    #include "testingLib.h"
+    #include "testingLib.hpp"
     #include <print>
     void type_something(char* str) {
         std::println("Message: {}", str);
@@ -633,3 +633,96 @@ Remember to locate your python caller script to reach the shared library.
     clean:
             rm -f $(TARGET)
     run: $(TARGET)
+
+# UBUNTU
+
+Here you are aiming at building on the very same Ubuntu but using latest g++ compilers, debuggers, postgres ddbb, ....
+
+**main.cpp**
+
+    #include <print>
+    int main() {
+            std::println("Hello World!");
+            return 0;
+    }
+
+**Makefile**
+
+    # Toolchain Paths
+    PREFIX      ?= /opt/toolchain/gcc15-ubuntu
+    CXX         := $(PREFIX)/bin/g++
+    CXXFLAGS    := -std=c++23 -Wall -Wextra -O2
+    LDFLAGS     := -L$(PREFIX)/lib64 -Wl,-rpath,$(PREFIX)/lib64
+    # Targets
+    TARGET      := hello_print
+    SRC         := main.cpp
+    all: $(TARGET)
+    $(TARGET): $(SRC)
+            $(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+    clean:
+            rm -f $(TARGET)
+    .PHONY: all clean
+
+### Regarding to Python
+
+Here you are a little shared library to be invoked by python on Ubuntu.
+
+Remember to locate your python caller script to reach the shared library.
+
+**testingLib_caller.py**
+
+    import ctypes
+    TESTING_LIB = ctypes.CDLL('./build/testingLib.so')
+    TESTING_LIB.type_something.argtypes = [ ctypes.c_char_p ]
+    TESTING_LIB.type_something.restype = None 
+    my_str = ctypes.c_char_p("Testing cross-built shared library".encode('utf-8'))
+    TESTING_LIB.type_something(my_str)
+
+**testingLib.hpp**
+
+    #ifndef TESTINGLIB_HPP
+    #define TESTINGLIB_HPP
+    #ifdef __cplusplus
+    extern "C" {
+    #endif
+    void type_something(char* str);
+    #ifdef __cplusplus
+    }
+    #endif
+    #endif // TESTINGLIB_HPP
+
+**CMakeLists.txt**
+
+    cmake_minimum_required(VERSION 3.20)
+    set(CMAKE_CXX_COMPILER_WORKS TRUE)
+    set(CMAKE_C_COMPILER_WORKS TRUE)
+    set(CMAKE_C_COMPILER   "/opt/chaintool/gcc15-ubuntu/bin/gcc")
+    set(CMAKE_CXX_COMPILER "/opt/chaintool/gcc15-ubuntu/bin/g++")
+    project(testingLib CXX)
+    set(SYSROOT "/opt/chaintool/gcc15-almalinux/sysroot")
+    set(GCC_LIB "/opt/chaintool/gcc15-almalinux/lib64")
+    set(CMAKE_CXX_STANDARD 23)
+    # Compiler flags
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+        --sysroot=${SYSROOT} \
+        -B${SYSROOT}/usr/lib64 \
+        -static-libstdc++ -static-libgcc")
+    # Linker flags
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} \
+        -L${SYSROOT}/usr/lib64 \
+        -L${GCC_LIB} \
+        -Wl,--start-group -lc -lm -lgcc_s -Wl,--end-group \
+        ${SYSROOT}/usr/lib64/ld-linux-x86-64.so.2 \
+        -Wl,-rpath-link,${SYSROOT}/lib64")
+    # Build shared library
+    add_library(testingLib SHARED main.cpp)
+
+**main.cpp**
+
+    #include "testingLib.hpp"
+    #include <print>
+    void type_something(char* str) {
+        std::println("Message: {}", str);
+    }
+
+
