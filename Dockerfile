@@ -197,7 +197,22 @@ RUN cmake -S . -B build \
 RUN cmake --build build -j$(nproc) && \
     cmake --install build
 
-########## AlmaLinux 9.7 First Stage #############
+## ------ HD5 2.1 -------
+WORKDIR /build/hd5
+RUN curl -L https://github.com/HDFGroup/hdf5/archive/refs/tags/2.1.0.tar.gz | tar xz --strip-components=1
+# We pass the flags, but the key change is in the 'cmake --build' step below
+RUN cmake -S . -B build \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hd5 \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DHDF5_BUILD_HL_LIB=ON \
+    -DHDF5_BUILD_EXAMPLES=OFF \
+    -DCACHED_VALUES=ON \
+    -DCMAKE_CXX_FLAGS="--sysroot=${PREFIX}/sysroot -static -fPIC" \
+    -DCMAKE_EXE_LINKER_FLAGS="-static" 
+RUN cmake --build build -j$(nproc) && \
+    cmake --install build
+
+######### AlmaLinux 9.7 First Stage #############
 
 # STAGE 1: Build GCC 15.2 on AlmaLinux 9
 FROM almalinux:9.7 AS gcc15-almalinux
@@ -414,6 +429,16 @@ RUN cmake -S . -B build \
 RUN cmake --build build -j$(nproc) && \
     cmake --install build
 
+# ------ HD5 2.1 -------
+WORKDIR /build/hd5
+RUN curl -L https://github.com/HDFGroup/hdf5/archive/refs/tags/2.1.0.tar.gz | tar xz --strip-components=1
+# We pass the flags, but the key change is in the 'cmake --build' step below
+RUN cmake -S . -B build \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hd5 \
+    -DCMAKE_CXX_FLAGS="--sysroot=${PREFIX}/sysroot -fPIC" 
+RUN cmake --build build -j$(nproc) && \
+    cmake --install build
+
 ########## Ubuntu 24.04 First Stage #############
 
 # STAGE 1: Build Toolchain, CMake 4.2.3, and Static Libs
@@ -609,6 +634,16 @@ RUN ./configure --prefix="${PREFIX}/postgres" \
     CPPFLAGS="-I${PREFIX}/openssl/include" \
     LDFLAGS="-L${PREFIX}/openssl/lib"
 RUN make -j$(nproc) && make install
+
+# ------ HD5 2.1 -------
+WORKDIR /build/hd5
+RUN curl -L https://github.com/HDFGroup/hdf5/archive/refs/tags/2.1.0.tar.gz | tar xz --strip-components=1
+# We pass the flags, but the key change is in the 'cmake --build' step below
+RUN cmake -S . -B build \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hd5 \
+    -DCMAKE_CXX_FLAGS="-fPIC"
+RUN cmake --build build -j$(nproc) && \
+    cmake --install build
 
 ############ Ubuntu 24.04 FINAL STAGE ####################### 
 FROM ubuntu:24.04
