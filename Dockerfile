@@ -310,6 +310,7 @@ RUN wget https://github.com/openssl/openssl/releases/download/openssl-3.4.0/open
 RUN ./Configure linux-x86_64 \
     --prefix=${PREFIX}/openssl \
     --openssldir=${PREFIX}/openssl \
+    no-atexit \
     no-shared \
     no-tests \
     no-zlib \
