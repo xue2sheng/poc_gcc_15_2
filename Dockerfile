@@ -198,13 +198,14 @@ RUN cmake --build build -j$(nproc) && \
     cmake --install build
 
 ## ------ HD5 2.1 -------
-WORKDIR /build/hd5
+WORKDIR /build/hdf5
 RUN curl -L https://github.com/HDFGroup/hdf5/archive/refs/tags/2.1.0.tar.gz | tar xz --strip-components=1
 # We pass the flags, but the key change is in the 'cmake --build' step below
 RUN cmake -S . -B build \
-    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hd5 \
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hdf5 \
     -DBUILD_SHARED_LIBS=OFF \
     -DHDF5_BUILD_HL_LIB=ON \
+    -DHDF5_BUILD_CPP_LIB=ON \
     -DHDF5_BUILD_EXAMPLES=OFF \
     -DCACHED_VALUES=ON \
     -DCMAKE_CXX_FLAGS="--sysroot=${PREFIX}/sysroot -static -fPIC" \
@@ -430,12 +431,13 @@ RUN cmake --build build -j$(nproc) && \
     cmake --install build
 
 # ------ HD5 2.1 -------
-WORKDIR /build/hd5
+WORKDIR /build/hdf5
 RUN curl -L https://github.com/HDFGroup/hdf5/archive/refs/tags/2.1.0.tar.gz | tar xz --strip-components=1
 # We pass the flags, but the key change is in the 'cmake --build' step below
 RUN cmake -S . -B build \
-    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hd5 \
-    -DCMAKE_CXX_FLAGS="--sysroot=${PREFIX}/sysroot -fPIC" 
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hdf5 \
+    -DCMAKE_CXX_FLAGS="--sysroot=${PREFIX}/sysroot -fPIC" \
+    -DHDF5_BUILD_CPP_LIB=ON 
 RUN cmake --build build -j$(nproc) && \
     cmake --install build
 
@@ -636,12 +638,13 @@ RUN ./configure --prefix="${PREFIX}/postgres" \
 RUN make -j$(nproc) && make install
 
 # ------ HD5 2.1 -------
-WORKDIR /build/hd5
+WORKDIR /build/hdf5
 RUN curl -L https://github.com/HDFGroup/hdf5/archive/refs/tags/2.1.0.tar.gz | tar xz --strip-components=1
 # We pass the flags, but the key change is in the 'cmake --build' step below
 RUN cmake -S . -B build \
-    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hd5 \
-    -DCMAKE_CXX_FLAGS="-fPIC"
+    -DCMAKE_INSTALL_PREFIX=${PREFIX}/hdf5 \
+    -DCMAKE_CXX_FLAGS="-fPIC" \
+    -DHDF5_BUILD_CPP_LIB=ON
 RUN cmake --build build -j$(nproc) && \
     cmake --install build
 
