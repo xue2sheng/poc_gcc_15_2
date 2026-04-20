@@ -692,11 +692,19 @@ RUN wget https://github.com/starship/starship/releases/download/v1.24.2/starship
 RUN tar xvzf starship-x86_64-unknown-linux-musl.tar.gz && mkdir ${PREFIX}/starship && cp ./starship ${PREFIX}/starship
 
 # ------------------------------------------------------------------
-# Runtime environment
+# Valgrind 
 # ------------------------------------------------------------------
-ENV PATH=${BOTAN_PREFIX}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${BOTAN_PREFIX}/lib:${LD_LIBRARY_PATH}
-ENV PKG_CONFIG_PATH=${BOTAN_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	automake autoconf libc6-dbg \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+RUN git clone https://sourceware.org/git/valgrind.git
+WORKDIR /build/valgrind
+RUN ./autogen.sh
+ENV PATH=${PREFIX}/bin:$PATH
+RUN ./configure --prefix=${PREFIX}/valgrind CC=${PREFIX}/bin/gcc CXX=${PREFIX}/bin/g++
+RUN make -j$(nproc)
+RUN make install
 
 ############ Ubuntu 24.04 FINAL STAGE ####################### 
 FROM ubuntu:24.04
@@ -718,8 +726,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Setup Environment
-ENV PATH="/opt/toolchain/gcc15-ubuntu/postgres/bin:/opt/toolchain/gcc15-ubuntu/gdb/bin:/opt/toolchain/gcc15-ubuntu/bin:/opt/toolchain/gcc15-ubuntu/cmake/bin:/opt/toolchain/gcc15-ubuntu/botan/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/opt/toolchain/gcc15-ubuntu/postgres/lib:/opt/toolchain/gcc15-ubuntu/lib64:/opt/toolchain/gcc15-ubuntu/lib:/opt/toolchain/gcc15-ubuntu/botan/lib:${LD_LIBRARY_PATH:-}"
+ENV PATH="/opt/toolchain/gcc15-ubuntu/postgres/bin:/opt/toolchain/gcc15-ubuntu/gdb/bin:/opt/toolchain/gcc15-ubuntu/bin:/opt/toolchain/gcc15-ubuntu/cmake/bin:/opt/toolchain/gcc15-ubuntu/botan/bin:/opt/toolchain/gcc15-ubuntu/valgrind/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/opt/toolchain/gcc15-ubuntu/postgres/lib:/opt/toolchain/gcc15-ubuntu/lib64:/opt/toolchain/gcc15-ubuntu/lib:/opt/toolchain/gcc15-ubuntu/botan/lib:/opt/toolchain/gcc15-ubuntu/valgrind/lig:${LD_LIBRARY_PATH:-}"
 
 WORKDIR /root
 EXPOSE 5432
