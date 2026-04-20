@@ -241,7 +241,7 @@ RUN ../gcc-15.2.0/configure --prefix=${PREFIX} \
                 --disable-bootstrap \
                 --disable-libsanitizer
 
-RUN make -j$(nproc)
+RUN VERBOSE=1 make -j1
 RUN make install
 
 # --- REVISED SYSROOT CONSTRUCTION ---
@@ -648,6 +648,56 @@ RUN cmake -S . -B build \
 RUN cmake --build build -j$(nproc) && \
     cmake --install build
 
+# ---- Botan 3 -----------
+ARG BOTAN_VERSION=3.11.1
+# ------------------------------------------------------------------
+# Toolchain paths
+# ------------------------------------------------------------------
+ENV BOTAN_PREFIX=${PREFIX}/botan
+ENV CC=${PREFIX}/bin/gcc
+ENV CXX=${PREFIX}/bin/g++
+ENV PATH=${PREFIX}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${PREFIX}/lib:${PREFIX}/lib64:${LD_LIBRARY_PATH}
+# ------------------------------------------------------------------
+# Build dependencies
+# ------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    xz-utils \
+    python3 \
+    python3-dev \
+    make \
+    libssl-dev \
+    pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+# ------------------------------------------------------------------
+# Build Botan from source
+# ------------------------------------------------------------------
+WORKDIR /build
+RUN wget https://botan.randombit.net/releases/Botan-${BOTAN_VERSION}.tar.xz \
+ && tar -xf Botan-${BOTAN_VERSION}.tar.xz \
+ && cd Botan-${BOTAN_VERSION} \
+ && python3 ./configure.py \
+        --prefix=${PREFIX}/botan \
+        --cc=gcc \
+        --os=linux \
+        --disable-modules=legacy \
+ && make -j$(nproc) \
+ && make install
+
+#----- git prompt -----
+WORKDIR /build
+RUN wget https://github.com/starship/starship/releases/download/v1.24.2/starship-x86_64-unknown-linux-musl.tar.gz
+RUN tar xvzf starship-x86_64-unknown-linux-musl.tar.gz && mkdir ${PREFIX}/starship && cp ./starship ${PREFIX}/starship
+
+# ------------------------------------------------------------------
+# Runtime environment
+# ------------------------------------------------------------------
+ENV PATH=${BOTAN_PREFIX}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${BOTAN_PREFIX}/lib:${LD_LIBRARY_PATH}
+ENV PKG_CONFIG_PATH=${BOTAN_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
+
 ############ Ubuntu 24.04 FINAL STAGE ####################### 
 FROM ubuntu:24.04
 
@@ -668,8 +718,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Setup Environment
-ENV PATH="/opt/toolchain/gcc15-ubuntu/postgres/bin:/opt/toolchain/gcc15-ubuntu/gdb/bin:/opt/toolchain/gcc15-ubuntu/bin:/opt/toolchain/gcc15-ubuntu/cmake/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/opt/toolchain/gcc15-ubuntu/postgres/lib:/opt/toolchain/gcc15-ubuntu/lib64:/opt/toolchain/gcc15-ubuntu/lib:${LD_LIBRARY_PATH:-}"
+ENV PATH="/opt/toolchain/gcc15-ubuntu/postgres/bin:/opt/toolchain/gcc15-ubuntu/gdb/bin:/opt/toolchain/gcc15-ubuntu/bin:/opt/toolchain/gcc15-ubuntu/cmake/bin:/opt/toolchain/gcc15-ubuntu/botan/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/opt/toolchain/gcc15-ubuntu/postgres/lib:/opt/toolchain/gcc15-ubuntu/lib64:/opt/toolchain/gcc15-ubuntu/lib:/opt/toolchain/gcc15-ubuntu/botan/lib:${LD_LIBRARY_PATH:-}"
 
 WORKDIR /root
 EXPOSE 5432
